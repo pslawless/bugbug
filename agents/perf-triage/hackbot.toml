@@ -1,0 +1,3 @@
+# perf-triage needs no platform prep: no [source] checkout, no [firefox] build.
+# The bug comes from the request (bug_id) and triage reads it through the broker;
+# a linked profile is fetched by profiler-cli at run time.
