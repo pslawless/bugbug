@@ -1,0 +1,17 @@
+# Calculator attribute criteria
+
+Review the bug details, profiles, and comments to assess:
+- *Platforms* (`--platforms`) The platforms where the bug is known to occur. That normally includes the platform the reporter hit it on, taken from what they describe (their user agent, OS, or device), not from the OS / Platform field, which is often a default. Add other platforms only when someone reports or reproduces it there, or the cause is clearly platform-independent. Leave it empty only when the bug gives no platform information.
+- *Resource impact* Only specify if resource use is a PRIMARY concern, not a side-effect
+- *Configuration* Can refer to uncommon hardware, uncommon feature usage, or unusual browser state (hundreds of tabs, long runtime, etc.)
+- *Reproducible locally* (`--reproducible`) Refers to engineers/agents having been able to reproduce. STR or the reporter reproducing is not relevant. This flag is strictly for whether an engineer or QA has indicated they can reproduce the bug locally. If a user with an @mozilla.com address has reproduced it, treat that as reproduced. Three states, and the distinction between the last two matters:
+  - `reproduced` — an engineer or QA says they reproduced it locally.
+  - `not-reproduced` — an engineer or QA says they **tried and could not** reproduce it. This requires positive evidence of a failed attempt, not merely the absence of a confirmation.
+  - `not-attempted` (default) — nobody has said either way. Use this whenever the bug is silent on reproduction; do NOT infer `not-reproduced` from silence.
+- *Multiple reporters* (`--multiple-reporters`) Means **multiple people independently hit and reported the bug**, e.g. duplicate bugs filed against it, several commenters saying they see it too on their own machines, or a bug filed on behalf of many users. It is NOT "a bunch of people commented on the bug" — a long discussion among engineers, triagers, or a single reporter going back and forth is still one reporter. It is also NOT an engineer confirming they can reproduce it; that is `--reproducible reproduced` and nothing more. Do not set this flag on the strength of comment volume alone; if you cannot point to distinct people independently encountering the bug, leave it off.
+- *Multiple sites* (`--multiple-sites`) The same root cause reported on multiple sites, typically across separate bugs. Several hostnames mentioned inside one report is not enough.
+- *Websites affected* (`--pages-affected`) Use `unclear` when the bug does not give enough information to tell how many sites are affected. It scores the same as `common` (×1) but records that the input was unknown rather than assessed, so prefer it over guessing `common`.
+- *Animation* Only for web-driven animated content, NOT browser UI (scrolling, resizing, tab switches)
+- *Impact on browser* This is strictly for when the browser UI is affected, not just because a website is slow.
+- *Impact on site* A site is strictly considered unusable if it is janked so severely a user cannot get anything done on it. In this case it should not also be considered to have a severe navigation impact. A page that never finishes loading (stuck indefinitely, not merely slow) also counts as unusable, with page load impact left at its default.
+- *Reproduces in Chrome* (`--chrome`) Set only when someone reports that the same problem also happens in Chrome. A report that Chrome is fine, or faster, is the opposite and means leaving it off. Silence means leaving it off.
