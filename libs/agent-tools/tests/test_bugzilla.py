@@ -55,6 +55,79 @@ async def test_search_bugs_raises_tool_error_on_bugsy_failure():
     assert ei.value.payload["error"] == "access_denied"
 
 
+def _json_decode_error_with_status(status: int):
+    """A JSONDecodeError carrying a response, as bugsy raises on an empty body.
+
+    bugsy's _handle_errors calls response.json() BEFORE checking the status
+    code, so a 429 with an empty body surfaces as a bare JSONDecodeError and the
+    status is only recoverable from the attached response.
+    """
+    import json
+
+    err = json.JSONDecodeError("Expecting value", "", 0)
+    err.response = MagicMock(status_code=status, headers={})
+    return err
+
+
+def test_a_rate_limit_is_reported_as_retryable_not_as_a_generic_failure():
+    """A 429 must be distinguishable from a real failure.
+
+    Observed live: hammering Bugzilla during a backlog sweep got us HTTP 429
+    with an empty body. Every read failed as "bugzilla_request_failed:
+    Expecting value: line 1 column 1", which tells the model nothing — it
+    retried blindly, burned 8 turns, and finished without submitting a result.
+    A rate limit is temporary and the model needs to know that.
+    """
+    client = MagicMock()
+    client.request.side_effect = _json_decode_error_with_status(429)
+    ctx = BugzillaContext(client=client)
+
+    with pytest.raises(ToolError) as excinfo:
+        bugzilla._request(ctx, "bug", {"id": 1})
+
+    payload = excinfo.value.payload
+    assert payload["error"] == "bugzilla_rate_limited"
+    assert payload["retryable"] is True
+    assert "429" in str(payload.get("status", "")) or payload.get("status") == 429
+
+
+def test_a_rate_limit_surfaces_retry_after_when_bugzilla_sends_one():
+    client = MagicMock()
+    err = _json_decode_error_with_status(429)
+    err.response.headers = {"Retry-After": "120"}
+    client.request.side_effect = err
+    ctx = BugzillaContext(client=client)
+
+    with pytest.raises(ToolError) as excinfo:
+        bugzilla._request(ctx, "bug", {"id": 1})
+
+    assert excinfo.value.payload["retry_after_seconds"] == 120
+
+
+def test_a_non_429_empty_body_is_still_a_generic_failure():
+    # A 502 with an empty body is not a rate limit; do not mislabel it.
+    client = MagicMock()
+    client.request.side_effect = _json_decode_error_with_status(502)
+    ctx = BugzillaContext(client=client)
+
+    with pytest.raises(ToolError) as excinfo:
+        bugzilla._request(ctx, "bug", {"id": 1})
+
+    assert excinfo.value.payload["error"] == "bugzilla_request_failed"
+
+
+def test_an_error_without_a_response_is_still_a_generic_failure():
+    # A connection error has no .response at all; must not crash the handler.
+    client = MagicMock()
+    client.request.side_effect = ConnectionError("connection refused")
+    ctx = BugzillaContext(client=client)
+
+    with pytest.raises(ToolError) as excinfo:
+        bugzilla._request(ctx, "bug", {"id": 1})
+
+    assert excinfo.value.payload["error"] == "bugzilla_request_failed"
+
+
 def _attachment_client(att, *, data="aGVsbG8="):
     """A bugsy client that serves one attachment, with and without its data.
 

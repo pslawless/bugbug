@@ -221,6 +221,42 @@ def _request(ctx: BugzillaContext, path: str, params: dict[str, Any] | None = No
     except bugsy.BugsyException as e:
         raise _bugsy_error(e) from e
     except Exception as e:
+        # A rate limit needs its own error: it is temporary, and the caller's
+        # correct response (wait, or stop and report) is the opposite of a real
+        # failure's. bugsy's _handle_errors calls response.json() BEFORE looking
+        # at the status code, so a 429 with an empty body arrives here as a bare
+        # JSONDecodeError -- the status is only recoverable from the attached
+        # response. Seen live: a backlog sweep tripped Bugzilla's limit and every
+        # read failed as an opaque "Expecting value: line 1 column 1", so the
+        # agent retried blindly and finished with no result at all.
+        response = getattr(e, "response", None)
+        status = getattr(response, "status_code", None)
+        if status == 429:
+            retry_after = None
+            headers = getattr(response, "headers", None) or {}
+            try:
+                raw = headers.get("Retry-After")
+                retry_after = int(raw) if raw is not None else None
+            except TypeError, ValueError:
+                retry_after = None
+            payload: dict[str, Any] = {
+                "error": "bugzilla_rate_limited",
+                "status": 429,
+                "retryable": True,
+                "path": path,
+                "message": (
+                    "Bugzilla is rate limiting this client (HTTP 429). This is "
+                    "temporary and not a problem with the request."
+                ),
+                "hint": (
+                    "Do not retry in a tight loop and do not vary the query to "
+                    "work around it — every read will fail the same way. Stop "
+                    "and report this as the outcome."
+                ),
+            }
+            if retry_after is not None:
+                payload["retry_after_seconds"] = retry_after
+            raise ToolError(payload["message"], payload=payload) from e
         raise ToolError(
             f"Bugzilla request to '{path}' failed: {type(e).__name__}: {e}",
             payload={
