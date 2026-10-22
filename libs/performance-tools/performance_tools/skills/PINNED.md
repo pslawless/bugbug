@@ -59,11 +59,11 @@ Bumping the pin is a deliberate, reviewable act, not something this task automat
 
 - Repo: `github.com/mozilla/performance-triage-calculator`
 - Path: `.claude/skills/triage-perf-bug/SKILL.md`
-- Pinned revision: `4fd98c4` on the unmerged branch `related-bugs-and-established`, one
-  commit on top of `main` `1718250b173aedbb9a8f46b2ace5dff6e64f672d` (PR #4). Not yet
+- Pinned revision: `3350b17` on the unmerged branch `related-bugs-and-established`, two
+  commits on top of `main` `1718250b173aedbb9a8f46b2ace5dff6e64f672d` (PR #4). Not yet
   pushed; re-pin to the merged commit once it lands on `main`.
 - Revision date: 2026-10-22
-- Revision subject: "triage-perf-bug: define established inputs, use same-mechanism related bugs"
+- Revision subject: "triage-perf-bug: a browser-wide hang leaves site impact at minor"
 - Vendored on: 2026-10-22
 - Branch at time of vendoring: `related-bugs-and-established`
 
