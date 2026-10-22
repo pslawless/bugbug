@@ -14,6 +14,8 @@ services:
     environment:
       BUGZILLA_API_URL: ${BUGZILLA_API_URL}
       BUGZILLA_API_KEY: ${BUGZILLA_API_KEY}
+      # Evaluation only (performance_tools/blind.py). Passed through only when set.
+      BLIND_BUG_ID:
     expose:
       - "8765"
 

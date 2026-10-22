@@ -23,6 +23,7 @@ from mcp.server.streamable_http_manager import (
     Send,
     StreamableHTTPSessionManager,
 )
+from performance_tools.blind import BlindClient
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.applications import Starlette
 from starlette.routing import Mount
@@ -33,6 +34,9 @@ log = logging.getLogger(__name__)
 class BrokerInputs(BaseSettings):
     bugzilla_api_url: str
     bugzilla_api_key: str
+    # Evaluation only: serve this bug, and its related bugs, as of its triage
+    # cutoff, so the engineer's rating and calculator comment are hidden.
+    blind_bug_id: int | None = None
     host: str = "0.0.0.0"
     port: int = 8765
 
@@ -43,6 +47,9 @@ def build_app(inputs: BrokerInputs) -> Starlette:
     client = bugsy.Bugsy(
         api_key=inputs.bugzilla_api_key, bugzilla_url=inputs.bugzilla_api_url
     )
+    if inputs.blind_bug_id is not None:
+        client = BlindClient(client, inputs.blind_bug_id)
+        log.warning("BLIND: bug %d served as of %s", inputs.blind_bug_id, client.cutoff)
     ctx = BugzillaContext(client=client)
     sdk_config = build_sdk_server("bugzilla", ctx, bugzilla.TOOLS)
     mcp_server = sdk_config["instance"]
