@@ -11,6 +11,7 @@ from app.schemas import (
     BugFixInputs,
     BuildRepairInputs,
     FrontendTriageInputs,
+    PerfTriageInputs,
     TestPlanGeneratorInputs,
     TestRepairInputs,
     UpliftInputs,
@@ -116,6 +117,19 @@ AGENT_REGISTRY: dict[str, AgentSpec] = {
         input_schema=FrontendTriageInputs,
         # Triage results reach a real bug unattended, so only the ones the agent
         # marked `auto_apply` qualify. Everything else stays for manual apply.
+        auto_apply_actions=True,
+        auto_apply_requires_consent=True,
+    ),
+    "perf-triage": AgentSpec(
+        name="perf-triage",
+        description=(
+            "Rate a Firefox performance bug with the Performance Impact "
+            "Calculator, analysing a linked profile, and set Performance Impact."
+        ),
+        job_name="hackbot-agent-perf-triage",
+        input_schema=PerfTriageInputs,
+        # Writes cf_performance_impact unattended, but only for runs whose rating
+        # held under every value of the inputs the bug left open (findings.auto_apply).
         auto_apply_actions=True,
         auto_apply_requires_consent=True,
     ),

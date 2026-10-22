@@ -202,6 +202,22 @@ def test_the_real_frontend_triage_spec_asks_for_consent():
     assert spec.auto_apply_requires_consent is True
 
 
+def test_the_perf_triage_spec_asks_for_consent():
+    # perf-triage writes cf_performance_impact unattended; only runs whose rating
+    # survived the stability check (findings.auto_apply) may do so.
+    spec = AGENT_REGISTRY["perf-triage"]
+    assert spec.auto_apply_actions is True
+    assert spec.auto_apply_requires_consent is True
+
+
+def test_an_unstable_perf_triage_run_is_held():
+    spec = AGENT_REGISTRY["perf-triage"]
+    run = _FakeRun(
+        status=RunStatus.succeeded.value, summary={"findings": {"auto_apply": False}}
+    )
+    assert not _auto_applies(spec, run)
+
+
 def test_which_agents_auto_apply_without_asking_for_consent():
     # `bug-fix` auto-applies whatever it records, and the apply step dispatches
     # against hackbot-api's *global* handler registry — creating bugs, attaching
@@ -325,7 +341,12 @@ async def test_other_agents_do_not_auto_apply():
     # only when the run vouched for itself, build-repair and test-repair only their
     # notifications, and everyone else stays human-gated.
     auto_apply = {n for n, s in AGENT_REGISTRY.items() if s.auto_apply_actions}
-    assert auto_apply == {"autowebcompat-intervention", "bug-fix", "frontend-triage"}
+    assert auto_apply == {
+        "autowebcompat-intervention",
+        "bug-fix",
+        "frontend-triage",
+        "perf-triage",
+    }
     assert AGENT_REGISTRY["test-repair"].always_apply_actions == {
         "email.send",
         "slack.post_message",
