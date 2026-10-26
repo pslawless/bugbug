@@ -59,9 +59,9 @@ Bumping the pin is a deliberate, reviewable act, not something this task automat
 
 - Repo: `github.com/mozilla/performance-triage-calculator`
 - Path: `.claude/skills/triage-perf-bug/SKILL.md`
-- Pinned revision: `253b1ee` (`main`; criteria.md only changed since `f73e94a`)
+- Pinned revision: `73e505b` (`main`; criteria.md only changed since `253b1ee`)
 - Revision date: 2026-10-26
-- Revision subject: "triage-perf-bug: define browser_impact's 5 categories (#6)"
+- Revision subject: "triage-perf-bug: chrome means a comparable problem in Chrome, latest report wins (#7)"
 - Vendored on: 2026-10-26
 - Branch at time of vendoring: `main`
 
