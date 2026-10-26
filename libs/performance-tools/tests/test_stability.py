@@ -123,3 +123,54 @@ def test_unattempted_reproducibility_is_not_varied():
     sel = {**SEL_1839859, "reproducible": ["reproducible-not-attempted"]}
     s = check_stability(sel, ["reproducible"])
     assert s.confident and s.flipping == ()
+
+
+def test_always_vary_fires_with_nothing_acknowledged_unestablished():
+    # reproducible=reproduced (x2) vs. not-attempted (x1) is enough to flip this
+    # fixture's site-major/pages-common bug from medium to low -- and nothing in
+    # `unestablished` names it, proving ALWAYS_VARY applies on its own.
+    sel = {
+        **SEL_1839859,
+        "platforms": ["platform-windows"],
+        "pages": ["pages-common"],
+    }
+    s = check_stability(sel, [])
+    assert not s.confident
+    assert "reproducible" in s.flipping
+
+
+def test_always_vary_reproducible_uses_adjacent_values_not_every_value():
+    # Full-range (acknowledged-unestablished) would also test not-reproduced
+    # (x0.5); adjacent-only (always-vary, not acknowledged) only checks the
+    # claimed value's neighbors on the ladder, so the two can disagree about
+    # which bands are reachable from the same starting selections.
+    sel = {
+        **SEL_1839859,
+        "platforms": ["platform-windows"],
+        "pages": ["pages-common"],
+        "reproducible": ["reproducible-not-attempted"],
+    }
+    always_vary = check_stability(sel, [])
+    acknowledged = check_stability(sel, ["reproducible"])
+    assert always_vary.bands <= acknowledged.bands
+    assert always_vary.bands != acknowledged.bands or not acknowledged.confident
+
+
+def test_always_vary_platforms_matches_the_acknowledged_check():
+    # platforms has no ladder, so ALWAYS_VARY falls back to the same
+    # chosen-set-vs-all-four check an acknowledged-unestablished platforms gets.
+    sel = {**SEL_1839859, "platforms": ["platform-linux"], "pages": ["pages-common"]}
+    always_vary = check_stability(sel, [])
+    acknowledged = check_stability(sel, ["platforms"])
+    assert always_vary.bands == acknowledged.bands
+
+
+def test_pages_affected_is_not_always_varied():
+    # The one field excluded from ALWAYS_VARY -- see the module docstring for
+    # why (its multiplier range makes any always-vary check too blunt). Confirms
+    # an established-but-wrong pages-affected is NOT re-tested unless the skill
+    # itself names it unestablished.
+    sel = {**SEL_1839859, "pages": ["pages-rare"]}
+    s = check_stability(sel, [])
+    assert s.confident
+    assert "pages-affected" not in s.flipping

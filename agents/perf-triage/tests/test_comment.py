@@ -193,11 +193,17 @@ def test_held_by_a_combination_still_says_why():
     )
 
 
-def test_unattempted_reproducibility_does_not_hold_2061533():
-    # Live, this was held only by varying not-attempted to reproduced (x2).
+def test_always_vary_platforms_now_holds_2061533():
+    # Not-attempted reproducibility is still correctly excluded from varying
+    # (see test below) -- it alone would not have held this. But platforms
+    # (single-OS, never acknowledged unestablished) is now always re-tested
+    # alongside the acknowledged pages-affected, and the two together cross a
+    # band neither flips alone: this live bug's rating would not have survived
+    # unattended under the current, more cautious gate.
     r = result(selections=SEL_2061533, unestablished=["reproducible", "pages-affected"])
     s = check_stability(r.selections, r.unestablished)
-    assert s.confident and s.bands == {"low"}
+    assert not s.confident
+    assert s.bands == {"low", "medium"}
 
 
 def test_unestablished_inputs_show_the_value_assumed():

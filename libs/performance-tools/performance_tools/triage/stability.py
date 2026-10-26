@@ -12,6 +12,31 @@ neither is evidence the rating is stable.
 
 An unestablished ``reproducible`` left at not-attempted is not varied: nobody
 having tried is not evidence either way, so it scores as the neutral x1.
+
+``reproducible`` and ``platforms`` are also varied even when the skill reports
+them as established -- :data:`ALWAYS_VARY`. The gate above only catches
+*acknowledged* uncertainty: an input the skill is confident about but gets wrong
+is never re-tested, because nothing marks it unestablished in the first place.
+Measured against mozilla's tier-a-62 corpus (perf-triage-validator, 2026-10-26):
+of 30 wrong-bucket predictions, 17 (57%) had no unestablished input anywhere, so
+the confidence gate as originally designed would have waved all of them through
+regardless of its threshold. ``pages-affected`` had the single highest measured
+leverage of any input (how often a wrong value on that field alone flips the
+impact band) in that corpus, but its multiplier range (0.3x rare to 5x major) is
+wide enough that always-varying it collapses the gate to near-uselessness --
+tested at 1/62 bugs passing with every value checked, 29/62 even checking only
+the claimed value's immediate neighbors on the severity ladder, and worse still
+combined with anything else. Left out of :data:`ALWAYS_VARY` for that reason;
+its real fix is ground-truth telemetry (the unmerged commit grounding
+pages-affected's tiers in real pageload traffic), not a stability-gate
+workaround. ``reproducible`` is varied to its immediate neighbors on its own
+3-step ladder (not-reproduced / not-attempted / reproduced) rather than every
+value, for the same reason at smaller scale; ``platforms`` is varied the same
+way the gate already varies an acknowledged-unestablished ``platforms`` (the
+chosen set vs. all four). Combined, this passes 47/62 tier-a-62 bugs as
+confident -- see perf-triage-validator/reports/2026-10-26-hackbot-compare-15.md
+and harness/attribute_leverage.py for the underlying measurement. Revisit this
+list if criteria.md or the corpus it's measured against changes meaningfully.
 """
 
 from __future__ import annotations
@@ -33,6 +58,17 @@ _RADIO = {
 }
 _BOOLEAN = tuple(calc.ADDITIONAL_FACTORS)  # animation, multiple-sites, ...
 INPUTS = frozenset(_RADIO) | {"platforms"} | frozenset(_BOOLEAN)
+
+# Always re-tested regardless of what the skill reports as established -- see the
+# module docstring for why and the measurement these are drawn from. Deliberately
+# excludes pages-affected (its multiplier range makes an always-vary check too
+# blunt -- see the docstring).
+ALWAYS_VARY = frozenset({"reproducible", "platforms"})
+
+# reproducible's own severity order, for the adjacent-only variants ALWAYS_VARY
+# uses (varying to every value, like an acknowledged-unestablished reproducible
+# gets, would be as disruptive here as it is for pages-affected).
+_REPRODUCIBLE_LADDER = ("not-reproduced", "not-attempted", "reproduced")
 
 
 @dataclass(frozen=True)
@@ -89,32 +125,67 @@ def _variants(args: CalculatorArgs, name: str) -> list[CalculatorArgs]:
     ]
 
 
+def _adjacent_variants(args: CalculatorArgs, name: str) -> list[CalculatorArgs]:
+    """Gentler than :func:`_variants`: only the claimed value's immediate
+    neighbors on its severity ladder, not every value. Used for ALWAYS_VARY
+    fields the skill did *not* flag as unestablished -- see the module
+    docstring for why the full-range check would be too disruptive there.
+    ``platforms`` has no ladder (it's an unordered set with a group cap), so it
+    falls back to :func:`_variants`'s chosen-set-vs-all-four check unchanged.
+    """
+    if name == "platforms":
+        return _variants(args, name)
+    if name == "reproducible":
+        ladder = _REPRODUCIBLE_LADDER
+        current = args.reproducible
+    else:
+        return _variants(args, name)
+    i = ladder.index(current) if current in ladder else len(ladder) // 2
+    neighbors = {current}
+    if i > 0:
+        neighbors.add(ladder[i - 1])
+    if i < len(ladder) - 1:
+        neighbors.add(ladder[i + 1])
+    return [replace(args, **{_param(name): v}) for v in neighbors]
+
+
 def _band(args: CalculatorArgs) -> str:
     return calc.calculate_impact(**args.__dict__)[1]
 
 
-def _bands(args: CalculatorArgs, names: Sequence[str]) -> set[str]:
+def _bands(
+    args: CalculatorArgs, names: Sequence[str], *, adjacent_only: frozenset[str] = frozenset()
+) -> set[str]:
     combos = [args]
     for name in names:
-        combos = [v for c in combos for v in _variants(c, name)]
+        variants = _adjacent_variants if name in adjacent_only else _variants
+        combos = [v for c in combos for v in variants(c, name)]
     return {_band(c) for c in combos}
 
 
 def check_stability(
     selections: dict[str, list[str]], unestablished: Sequence[str]
 ) -> Stability:
-    """Re-score every combination of the unestablished inputs' values."""
+    """Re-score every combination of the unestablished inputs' values, plus
+    :data:`ALWAYS_VARY` for whichever of those the skill did not already name as
+    unestablished (those get the gentler adjacent-only check; see the module
+    docstring)."""
     args = args_from_selections(selections)
-    names = list(dict.fromkeys(unestablished))
-    unknown = tuple(n for n in names if n not in INPUTS)
+    acknowledged = list(dict.fromkeys(unestablished))
+    always_vary_only = [n for n in ALWAYS_VARY if n not in acknowledged]
+    names = [*acknowledged, *always_vary_only]
+    unknown = tuple(n for n in acknowledged if n not in INPUTS)
     known = [
         n
         for n in names
         if n in INPUTS
         and not (n == "reproducible" and args.reproducible == "not-attempted")
     ]
-    bands = _bands(args, known)
-    flipping = tuple(n for n in known if len(_bands(args, [n])) > 1)
+    adjacent_only = frozenset(n for n in always_vary_only if n in known)
+    bands = _bands(args, known, adjacent_only=adjacent_only)
+    flipping = tuple(
+        n for n in known if len(_bands(args, [n], adjacent_only=adjacent_only)) > 1
+    )
     return Stability(
         confident=len(bands) == 1 and not unknown,
         bands=frozenset(bands),
