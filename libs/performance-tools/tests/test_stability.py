@@ -125,35 +125,17 @@ def test_unattempted_reproducibility_is_not_varied():
     assert s.confident and s.flipping == ()
 
 
-def test_always_vary_fires_with_nothing_acknowledged_unestablished():
-    # reproducible=reproduced (x2) vs. not-attempted (x1) is enough to flip this
-    # fixture's site-major/pages-common bug from medium to low -- and nothing in
-    # `unestablished` names it, proving ALWAYS_VARY applies on its own.
+def test_established_reproducible_is_not_varied():
+    # reproduced (x2) vs. not-attempted (x1) flips this fixture from medium to
+    # low, but reproducible is out of scope for this phase: only an
+    # acknowledged-unestablished reproducible is varied.
     sel = {
         **SEL_1839859,
         "platforms": ["platform-windows"],
         "pages": ["pages-common"],
     }
-    s = check_stability(sel, [])
-    assert not s.confident
-    assert "reproducible" in s.flipping
-
-
-def test_always_vary_reproducible_uses_adjacent_values_not_every_value():
-    # Full-range (acknowledged-unestablished) would also test not-reproduced
-    # (x0.5); adjacent-only (always-vary, not acknowledged) only checks the
-    # claimed value's neighbors on the ladder, so the two can disagree about
-    # which bands are reachable from the same starting selections.
-    sel = {
-        **SEL_1839859,
-        "platforms": ["platform-windows"],
-        "pages": ["pages-common"],
-        "reproducible": ["reproducible-not-attempted"],
-    }
-    always_vary = check_stability(sel, [])
-    acknowledged = check_stability(sel, ["reproducible"])
-    assert always_vary.bands <= acknowledged.bands
-    assert always_vary.bands != acknowledged.bands or not acknowledged.confident
+    assert "reproducible" not in check_stability(sel, []).flipping
+    assert "reproducible" in check_stability(sel, ["reproducible"]).flipping
 
 
 def test_always_vary_platforms_matches_the_acknowledged_check():
