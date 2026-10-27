@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 from agent_tools.registry import ToolError
-from hackbot_agents.perf_triage.hooks import add_comment_hook, update_bug_hook
+from hackbot_agents.perf_triage.hooks import (
+    REVIEW_FLAGS,
+    add_comment_hook,
+    update_bug_hook,
+)
 from hackbot_runtime.actions import ActionsRecorder
 
 BUG = 1839859
@@ -47,6 +51,12 @@ def test_full_write_allowed():
     ]
 
 
+def test_reviewer_needinfo_allowed_on_high():
+    r = recorder()
+    update(r, {"cf_performance_impact": "high", "flags": REVIEW_FLAGS})
+    assert len(r.actions) == 1
+
+
 def test_top50_allowed():
     r = recorder()
     update(r, {"keywords": {"add": ["top50"]}})
@@ -65,6 +75,11 @@ def test_top50_allowed():
         {"component": "Layout"},
         {"cf_performance_impact": "?"},
         {"cf_performance_impact": "critical"},
+        {"cf_performance_impact": "medium", "flags": REVIEW_FLAGS},
+        {
+            "cf_performance_impact": "high",
+            "flags": [{"name": "needinfo", "status": "?", "requestee": "x@y.z"}],
+        },
         {},
     ],
 )

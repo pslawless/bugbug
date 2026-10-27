@@ -19,7 +19,7 @@ from performance_tools.triage.stability import check_stability
 
 from . import preflight
 from .comment import render_comment
-from .hooks import add_comment_hook, update_bug_hook
+from .hooks import REVIEW_FLAGS, add_comment_hook, update_bug_hook
 from .preflight import WriteMode
 
 TriageFn = Callable[[list[str]], Awaitable[TriageResult]]
@@ -97,6 +97,8 @@ async def run_perf_triage(
         changes: dict = {"cf_performance_impact": result.impact}
         if result.keywords:
             changes["keywords"] = {"add": list(result.keywords)}
+        if result.impact == "high":
+            changes["flags"] = REVIEW_FLAGS
         recorder.record(
             "bugzilla.update_bug",
             {"bug_id": bug_id, "changes": changes},

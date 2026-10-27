@@ -4,7 +4,8 @@ These are the whole safety boundary for an unattended run: hackbot-api applies
 whatever reaches ``summary.json`` on a confident run, dispatching it against a
 handler registry far wider than these two action types. So the hooks refuse
 anything outside the design's write surface as it is recorded -- one public
-comment, plus ``cf_performance_impact`` and added keywords on the triaged bug --
+comment, plus ``cf_performance_impact``, added keywords and (on a high rating) a
+needinfo to the reviewer on the triaged bug --
 and the refused action never lands. Pattern from frontend-triage's hooks.py.
 """
 
@@ -19,7 +20,11 @@ from .preflight import WriteMode
 ENABLED_ACTION_TYPES = ["bugzilla.add_comment", "bugzilla.update_bug"]
 
 IMPACT_VALUES = frozenset({"none", "low", "medium", "high"})
-_FIELDS = frozenset({"cf_performance_impact", "keywords"})
+_FIELDS = frozenset({"cf_performance_impact", "keywords", "flags"})
+
+# Reviews every high rating and takes disagreements (Bas, 2026-10-27).
+REVIEWER = "bas@basschouten.com"
+REVIEW_FLAGS = [{"name": "needinfo", "status": "?", "requestee": REVIEWER}]
 
 
 def _once(recorder: ActionsRecorder, action_type: str) -> None:
@@ -86,5 +91,10 @@ def update_bug_hook(
                 )
             if bad := [k for k in kw["add"] if k not in allowed_keywords]:
                 raise ToolError(f"not calculator keywords: {bad}")
+        if "flags" in changes:
+            if changes["flags"] != REVIEW_FLAGS:
+                raise ToolError(f"the only flag this agent sets is {REVIEW_FLAGS}")
+            if changes.get("cf_performance_impact") != "high":
+                raise ToolError("the reviewer is needinfo'd only on a high rating")
 
     return hook

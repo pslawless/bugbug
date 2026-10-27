@@ -165,3 +165,15 @@ async def test_failed_bug_lookup_records_nothing_and_skips_triage():
     assert not f.auto_apply
     assert f.skipped_reason == "bug lookup failed"
     assert called == []
+
+
+async def test_high_needinfos_the_reviewer():
+    _, r, _ = await run(triage(impact="high", score=60, keywords=[]))
+    assert r.actions[1]["params"]["changes"]["flags"] == [
+        {"name": "needinfo", "status": "?", "requestee": "bas@basschouten.com"}
+    ]
+
+
+async def test_below_high_sets_no_flag():
+    _, r, _ = await run(triage(impact="medium", score=30))
+    assert "flags" not in r.actions[1]["params"]["changes"]

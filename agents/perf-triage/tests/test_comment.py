@@ -166,6 +166,10 @@ def test_footer_reaction_then_tags_last():
     assert text.rstrip().endswith(FEEDBACK_TAGS)
 
 
+def test_disagreement_names_the_reviewer():
+    assert "Disagree with this assessment? Needinfo bas@basschouten.com." in render()
+
+
 def test_footer_tags_exact():
     assert FEEDBACK_TAGS.endswith(
         "perf-triage-{wrong-impact, wrong-component, wrong-cause, "
