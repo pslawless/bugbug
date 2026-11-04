@@ -115,3 +115,59 @@ def test_private_or_empty_comment_refused():
     refused(lambda: comment(r, is_private=True))
     refused(lambda: comment(r, text="  "))
     assert r.actions == []
+
+
+# --- the root-cause attachment ------------------------------------------------ #
+
+from hackbot_agents.perf_triage.hooks import (  # noqa: E402
+    add_attachment_hook,
+    root_cause_file_name,
+)
+
+
+def attach_recorder() -> ActionsRecorder:
+    r = ActionsRecorder(artifacts_dir=Path(tempfile.mkdtemp()))
+    r.add_hook("bugzilla.add_attachment", add_attachment_hook(r, BUG))
+    return r
+
+
+def attach(r, **over):
+    params = {
+        "bug_id": BUG,
+        "file_name": root_cause_file_name(BUG),
+        "summary": "Automated profile analysis",
+        "content_type": "text/markdown",
+        "is_patch": False,
+        "comment": "**Partial diagnosis** ...",
+    }
+    params.update(over)
+    return r.record("bugzilla.add_attachment", params)
+
+
+def test_the_root_cause_attachment_is_accepted():
+    r = attach_recorder()
+    attach(r)
+    assert len(r.actions) == 1
+
+
+def test_only_one_attachment():
+    r = attach_recorder()
+    attach(r)
+    refused(lambda: attach(r))
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"bug_id": BUG + 1},
+        {"file_name": "patch.diff"},
+        {"content_type": "text/x-shellscript"},
+        {"is_patch": True},
+        {"comment": "   "},
+        {"comment": None},
+    ],
+)
+def test_anything_else_is_refused(over):
+    r = attach_recorder()
+    refused(lambda: attach(r, **over))
+    assert r.actions == []

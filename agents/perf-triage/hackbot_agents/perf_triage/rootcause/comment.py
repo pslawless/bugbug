@@ -79,7 +79,7 @@ def _short_hot_path(hot_path: str, limit: int = 200) -> str:
     if len(chain) <= limit:
         return chain
 
-    for arrow in ("→", "->"):
+    for arrow in ("→", "->", "←", "<-"):
         if arrow in chain:
             frames = [f.strip() for f in chain.split(arrow) if f.strip()]
             if len(frames) >= 3:
@@ -156,6 +156,22 @@ def render_root_cause_comment(
         # Only a finding: "reached no conclusion" is the outcome, the headline
         # says what the profile lacks.
         parts = [f"**Profile analysis reached no conclusion.** {headline}"]
+    elif rc.confidence == "low":
+        # A low-confidence partial is one reading of several. This comment can
+        # post unattended alongside a confident rating, so it says no cause was
+        # established rather than lead with a guess; the leads are attached.
+        parts = [
+            "**Profile analysis was inconclusive.** It found leads but could not "
+            "support any of them with confidence, so this comment names no cause."
+        ]
+        parts.append(f"**Not established:** {_clean(rc.main_limitation)}")
+        if profile_url:
+            parts.append(f"Profile analysed: {profile_url}")
+        if attachment_name:
+            parts.append(
+                f"The leads, evidence and caveats: attached as {attachment_name}."
+            )
+        return "\n\n".join(parts)
     else:
         label = "Diagnosed" if rc.outcome == "diagnosed" else "Partial diagnosis"
         where = f" in `{component}`" if component else ""

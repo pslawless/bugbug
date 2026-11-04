@@ -2,11 +2,11 @@
 
 These are the whole safety boundary for an unattended run: hackbot-api applies
 whatever reaches ``summary.json`` on a confident run, dispatching it against a
-handler registry far wider than these two action types. So the hooks refuse
+handler registry far wider than these action types. So the hooks refuse
 anything outside the design's write surface as it is recorded -- one public
 comment, plus ``cf_performance_impact``, added keywords and (on a high rating) a
-needinfo to the reviewer on the triaged bug --
-and the refused action never lands. Pattern from frontend-triage's hooks.py.
+needinfo to the reviewer on the triaged bug, plus one root-cause attachment
+carrying its own comment -- and the refused action never lands. Pattern from frontend-triage's hooks.py.
 """
 
 from agent_tools.registry import ToolError
@@ -15,7 +15,13 @@ from hackbot_runtime.actions import ActionHook, ActionsRecorder
 
 from .preflight import WriteMode
 
-ENABLED_ACTION_TYPES = ["bugzilla.add_comment", "bugzilla.update_bug"]
+ENABLED_ACTION_TYPES = [
+    "bugzilla.add_comment",
+    "bugzilla.update_bug",
+    "bugzilla.add_attachment",
+]
+
+ROOT_CAUSE_CONTENT_TYPE = "text/markdown"
 
 IMPACT_VALUES = frozenset({"none", "low", "medium", "high"})
 _FIELDS = frozenset({"cf_performance_impact", "keywords", "flags"})
@@ -111,5 +117,45 @@ def update_bug_hook(
                 raise ToolError(f"the only flag this agent sets is {REVIEW_FLAGS}")
             if changes.get("cf_performance_impact") != "high":
                 raise ToolError("the reviewer is needinfo'd only on a high rating")
+
+    return hook
+
+
+def root_cause_file_name(bug_id: int) -> str:
+    return f"root-cause-{bug_id}.md"
+
+
+def add_attachment_hook(recorder: ActionsRecorder, bug_id: int) -> ActionHook:
+    """One root-cause Markdown file on the triaged bug, with a non-empty comment.
+
+    The root-cause comment travels as the attachment's own comment, so Bugzilla
+    posts the two together: the comment can never point at a file that failed
+    to attach.
+    """
+
+    def hook(action: dict) -> None:
+        params = action.get("params") or {}
+        _once(recorder, "bugzilla.add_attachment")
+        _this_bug(params, bug_id)
+        if params.get("file_name") != root_cause_file_name(bug_id):
+            raise ToolError(
+                f"the only file this agent attaches is {root_cause_file_name(bug_id)}"
+            )
+        if params.get("content_type") != ROOT_CAUSE_CONTENT_TYPE:
+            raise ToolError(f"the root-cause file is {ROOT_CAUSE_CONTENT_TYPE}")
+        if params.get("is_patch"):
+            raise ToolError("the root-cause file is not a patch")
+        comment = params.get("comment")
+        if not isinstance(comment, str) or not comment.strip():
+            raise ToolError("the root-cause attachment needs its comment")
+
+    return hook
+
+
+def refuse_hook(reason: str) -> ActionHook:
+    """Refuse every action of a type, e.g. rating writes in root-cause mode."""
+
+    def hook(action: dict) -> None:
+        raise ToolError(reason)
 
     return hook

@@ -33,6 +33,7 @@ services:
     environment:
       - RUN_ID
       - BUG_ID
+      - MODE
       - MODEL
       - MAX_TURNS
       - EFFORT
