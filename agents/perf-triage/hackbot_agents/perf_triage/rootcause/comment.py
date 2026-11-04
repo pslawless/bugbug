@@ -187,9 +187,13 @@ def render_root_cause_comment(
     if rc.recommendation:
         recommendation.append(_clean(rc.recommendation))
     # A component that is not the bug's own is a proposed move, and the owner
-    # decides: both costs in a profile can be real.
+    # decides: both costs in a profile can be real. Only on `diagnosed`: a
+    # partial result located the cost but not its cause, so it cannot route the
+    # bug (1933799: partial pointed at localStorage while the cause, per the
+    # bug's comments, was QuotaManager init).
     if (
-        component
+        rc.outcome == "diagnosed"
+        and component
         and current_component
         and not _same_component(component, current_component)
     ):
