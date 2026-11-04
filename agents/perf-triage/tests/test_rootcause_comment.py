@@ -65,8 +65,9 @@ def test_comment_stays_concise(name):
     assert len(_comment(name)) < 3000
 
 
-@pytest.mark.parametrize("name", REAL)
+@pytest.mark.parametrize("name", [n for n in REAL if "1931896" not in n])
 def test_comment_is_composed_from_the_model_written_fields(name):
+    """Except a low-confidence result, which names no cause (tested below)."""
     rc, _ = _load(name)
     text = _comment(name)
     assert rc.headline in text
@@ -89,8 +90,27 @@ def test_comment_does_not_carry_the_attachment_only_fields(name):
 
 
 def test_a_partial_result_is_labelled_partial_with_its_confidence():
-    text = _comment("bug-1931896-partial-no-component")
-    assert text.startswith("**Partial diagnosis** (low confidence).")
+    text = _comment("bug-1988762-partial-webrender")
+    assert text.startswith("**Partial diagnosis** in `Core :: Graphics: WebRender`")
+    assert "(medium confidence)" in text.split("\n")[0]
+
+
+def test_a_low_confidence_result_names_no_cause():
+    """It can post unattended next to a confident rating, so it must not guess.
+
+    Patricia (2026-11-04): a low-confidence analysis is still attached, but the
+    comment says it was inconclusive.
+    """
+    rc, _ = _load("bug-1931896-partial-no-component")
+    assert rc.confidence == "low"
+    text = _comment("bug-1931896-partial-no-component", current_component="X :: Y")
+    assert text.startswith("**Profile analysis was inconclusive.**")
+    assert rc.headline not in text
+    assert rc.recommendation not in text
+    assert "Hot path" not in text
+    assert "Consider moving" not in text
+    assert rc.main_limitation in text
+    assert "attached as root-cause-1931896.md" in text
 
 
 def test_the_component_is_named_in_the_label_when_there_is_one():
@@ -262,3 +282,9 @@ def test_html_escaped_model_text_is_unescaped():
     assert "`Core :: DOM: Core & HTML`" in text
     assert "nsTArray_Impl<nsCOMPtr>" in text
     assert "&amp;" not in text and "&lt;" not in text
+
+
+def test_a_leaf_first_chain_is_elided_too():
+    """A real run wrote its hot path leaf-first with ← and was cut mid-word."""
+    chain = " ← ".join(f"frame{i}" for i in range(60))
+    assert _short_hot_path(chain, limit=100) == "frame0 ← ... ← frame59"

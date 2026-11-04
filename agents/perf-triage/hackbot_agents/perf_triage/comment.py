@@ -89,10 +89,19 @@ def _related(result: TriageResult) -> list[str]:
     ]
 
 
-def _profile(result: TriageResult, current_component: str) -> list[list[str]]:
+def _profile(
+    result: TriageResult, current_component: str, deferred_to: str | None = None
+) -> list[list[str]]:
     p = result.profile
     if p is None:
         return []
+    if deferred_to and p.analysed:
+        # The root-cause analysis is the one diagnosis on the bug; keep only
+        # what the profile did to the rating.
+        blocks = [[f"Profile: see the profile analysis posted with {deferred_to}."]]
+        if p.changed_attributes:
+            blocks.append([f"The profile changed: {_changed(p.changed_attributes)}"])
+        return blocks
     if not p.analysed:
         return [
             [
@@ -103,11 +112,7 @@ def _profile(result: TriageResult, current_component: str) -> list[list[str]]:
     source = p.url or (f"attachment {p.attachment}" if p.attachment else "")
     blocks = [[f"Profile ({_inline(source)}): {summary}"]]
     if p.changed_attributes:
-        changed = ", ".join(
-            f"{input_label(k)} → {_inline(value_label(k, v))}"
-            for k, v in p.changed_attributes.items()
-        )
-        blocks.append([f"The profile changed: {changed}"])
+        blocks.append([f"The profile changed: {_changed(p.changed_attributes)}"])
     component = _inline(p.component or "")
     if (
         result.component is None
@@ -118,6 +123,12 @@ def _profile(result: TriageResult, current_component: str) -> list[list[str]]:
             [f"Suggested component: {component} (filed in {current_component})"]
         )
     return blocks
+
+
+def _changed(attrs: dict) -> str:
+    return ", ".join(
+        f"{input_label(k)} → {_inline(value_label(k, v))}" for k, v in attrs.items()
+    )
 
 
 def _memory_report(result: TriageResult, current_component: str) -> list[list[str]]:
@@ -144,11 +155,15 @@ def _memory_report(result: TriageResult, current_component: str) -> list[list[st
     return blocks
 
 
-def _component(result: TriageResult, current_component: str) -> list[str]:
+def _component(
+    result: TriageResult, current_component: str, profile_deferred: bool = False
+) -> list[str]:
     """One suggestion from the skill's final decision; replaces the per-evidence ones."""
     c = result.component
     if c is None or c.action != "move" or not c.verified:
         return []
+    if profile_deferred and c.basis == "profile":
+        return []  # the root-cause comment owns profile-based routing
     name = _inline(c.name)
     if not name or name == _inline(current_component):
         return []
@@ -162,15 +177,21 @@ def render_comment(
     *,
     current_component: str,
     existing_impact: str | None,
+    profile_deferred_to: str | None = None,
 ) -> str:
-    """The full comment text, footer included."""
+    """The full comment text, footer included.
+
+    ``profile_deferred_to`` names the root-cause attachment when one is posted
+    in the same run; the profile summary and profile-based component move are
+    then left to it.
+    """
     sections: list[list[str]] = [
         [_GENERATED_BY.sub("", result.comment).strip()],
         _basis(result, stability),
         _related(result),
-        *_profile(result, current_component),
+        *_profile(result, current_component, profile_deferred_to),
         *_memory_report(result, current_component),
-        _component(result, current_component),
+        _component(result, current_component, bool(profile_deferred_to)),
     ]
     if result.severity:
         sections.append([f"Suggested severity: {result.severity}"])

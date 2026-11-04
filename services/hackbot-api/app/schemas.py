@@ -200,6 +200,8 @@ class FrontendTriageInputs(AgentInputs):
 
 class PerfTriageInputs(AgentInputs):
     bug_id: int
+    # "triage+root-cause" adds a profile analysis; "root-cause" runs only that.
+    mode: Literal["triage", "triage+root-cause", "root-cause"] = "triage"
     model: str | None = None
     max_turns: int | None = None
     effort: str | None = None

@@ -1,12 +1,13 @@
 import logging
 
 from hackbot_agents.perf_triage.inputs import BugIdInput
+from hackbot_agents.perf_triage.rootcause import RootCause
 from hackbot_agents.perf_triage.tasks import RunTracker, TaskConfig
 from hackbot_agents.perf_triage.triage import PerfTriage
 from hackbot_runtime import HackbotContext, run_async
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .agent import PerfTriageFindings, run_perf_triage
+from .agent import Mode, PerfTriageFindings, run_perf_triage
 
 logger = logging.getLogger("perf-triage")
 
@@ -16,6 +17,8 @@ class AgentInputs(BaseSettings):
     # Docker drops it and the default silently applies (tests/test_compose_env.py).
     broker_url: str
     bug_id: int
+    # Off by default: only "triage" runs unless a caller asks for root cause.
+    mode: Mode = "triage"
     model: str | None = None
     max_turns: int | None = None
     effort: str | None = None
@@ -49,8 +52,15 @@ async def main(ctx: HackbotContext) -> PerfTriageFindings:
             analyse_profile=bool(profile_urls),
         ).run()
 
+    async def root_cause(profile_url: str, bug_summary: str | None):
+        return await RootCause(
+            config, tracker, profile_url=profile_url, bug_summary=bug_summary
+        ).run()
+
     findings = await run_perf_triage(
         bug_id=inputs.bug_id,
+        mode=inputs.mode,
+        root_cause=root_cause,
         bugzilla_mcp_server=server,
         recorder=ctx.actions,
         triage=triage,
@@ -60,7 +70,7 @@ async def main(ctx: HackbotContext) -> PerfTriageFindings:
     logger.info(
         "perf-triage %s: %s",
         inputs.bug_id,
-        findings.model_dump_json(exclude={"triage"}),
+        findings.model_dump_json(exclude={"triage", "root_cause"}),
     )
     return findings
 
