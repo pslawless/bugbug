@@ -1,0 +1,22 @@
+{
+  "bug_id": 1933799,
+  "profile_url": "https://share.firefox.dev/4fLBDAW",
+  "result": {
+    "outcome": "inconclusive",
+    "summary": "The profile loads and is symbolicated (Firefox 135 Nightly, macOS 14.4.1, 7.755s, 1ms sampling). It does not show a page load. Searching all 45 threads finds no DocumentLoad, FirstContentfulPaint or Network markers. `thread network` finds 0 requests, and `thread page-load` finds no page-load markers. The most active content process (Isolated Web Content 12/24) used 4.7ms of CPU in total. The parent GeckoMain thread is idle in 7073 of 7713 samples (91.7%). Its activity is chrome UI: mousemove/pointer events, a popup opening, opacity CSS transitions, and a single 56ms idle-priority runnable that is SessionStore writing session state with IOUtils.writeJSON / JS_Stringify. Nothing here can be tied to a slow page load. A new capture is needed that starts before the navigation and runs until the page has finished loading, with the content process threads included.",
+    "hot_path": null,
+    "component": null,
+    "recommendation": "Ask the reporter for a new profile: start the profiler before navigating, load the slow page, and stop once it has finished loading. Use the default \"Web Developer\" or \"Graphics\" preset so the content-process threads and network markers are captured.",
+    "controls": [],
+    "headline": "The attached profile has no page load in it: no navigation, no DocumentLoad/FCP markers and no network requests in any process, and every process sits more than 90% idle for the 7.8s capture.",
+    "key_figures": [
+      "0 network requests and 0 DocumentLoad/FCP markers across all 45 threads",
+      "Busiest web content process used 4.7ms of CPU in 7.755s",
+      "Parent main thread idle in 7073 of 7713 samples (91.7%)"
+    ],
+    "main_limitation": "The capture does not contain the slow page load, so it says nothing about where page-load time goes.",
+    "evidence": "- Profile: 7.755s, 45 threads across 35 processes, thread filter GeckoMain/Compositor/Renderer/SwComposite/DOM Worker, features js/screenshots/stackwalk/cpu/processcpu/memory.\n- `profile markers --search DocumentLoad`, `--search FirstContentfulPaint` and `--search Network`: no matches in any of the 45 threads.\n- `thread network` on the parent: 0 requests, 0s in flight.\n- CPU over the whole capture: parent process 872ms (GeckoMain 636ms, Renderer 212ms). The busiest content GeckoMain is Privileged Content at 18.2ms, then Isolated Web Content 12/24 at 4.7ms and 24/24 at 2.9ms. All other content processes are under 2ms.\n- Parent GeckoMain: 7073 of 7713 samples (91.7%) idle. Graphics 235, Other 172, DOM 80, Layout 63, JS 58.\n- Parent DOMEvent markers are pointermove/mousemove (197 each), MozAfterPaint (179), mouseover/out, popupshowing/popuppositioned and one pointerdown. These are chrome UI interaction events, not page load.\n- Only Jank marker: 55.2ms at t=1.763s, inside a 56.46ms ChromeUtils::IdleDispatch runnable. 23 of its 56 samples have InfallibleQuoteJSONString as the leaf, reached through JS_Stringify \u2190 IOUtils::WriteJSON \u2190 SessionWriter.sys.mjs!write (the SessionStore flush).\n- Isolated Web Content 12/24 has 30 markers in total (Awake, Histogram::Add, Process Priority). It has no layout, script or load markers.",
+    "confidence": "high",
+    "caveats": "The confidence applies to the absence finding: this profile has no page-load activity. It does not mean the reported slowdown is unreal. The load may have happened before the capture started, or in a process or thread this capture did not record. The reference scale bands were not applied because the profile has no page-load duration and the bug gives no figure. The 56ms SessionStore writeJSON jank is real and visible, but nothing links it to the reported symptom, so it is not offered as an explanation. It is one idle-priority task in the parent and would not hold up a content-process load. Screenshots were recorded, but I did not inspect them to see what was on screen."
+  }
+}
