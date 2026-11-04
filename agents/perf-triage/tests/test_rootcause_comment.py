@@ -143,8 +143,22 @@ def test_a_diagnosed_result_is_labelled_diagnosed():
 # --- component suggestion --------------------------------------------------- #
 
 
-def test_a_different_component_is_a_suggestion_to_move():
+def _diagnosed_comment(name, **kw):
+    rc, _ = _load(name)
+    rc = rc.model_copy(update={"outcome": "diagnosed", "confidence": "high"})
+    return render_root_cause_comment(rc, **kw)
+
+
+def test_a_partial_result_suggests_no_move():
+    """It located the cost, not the cause, so it cannot route the bug."""
     text = _comment(
+        "bug-1988762-partial-webrender", current_component="Core :: Performance"
+    )
+    assert "Consider moving" not in text
+
+
+def test_a_different_component_is_a_suggestion_to_move():
+    text = _diagnosed_comment(
         "bug-1988762-partial-webrender", current_component="Core :: Performance"
     )
     assert "Consider moving this to `Core :: Graphics: WebRender`" in text
@@ -153,7 +167,7 @@ def test_a_different_component_is_a_suggestion_to_move():
 
 def test_the_same_component_is_not_reported():
     """Agreement is not worth a sentence."""
-    text = _comment(
+    text = _diagnosed_comment(
         "bug-1988762-partial-webrender",
         current_component="Core :: Graphics: WebRender",
     )
@@ -161,7 +175,7 @@ def test_the_same_component_is_not_reported():
 
 
 def test_the_same_component_is_matched_across_product_and_spacing():
-    text = _comment(
+    text = _diagnosed_comment(
         "bug-1933799-partial-component",
         current_component="Storage:  localStorage & sessionStorage",
     )
@@ -169,7 +183,7 @@ def test_the_same_component_is_matched_across_product_and_spacing():
 
 
 def test_no_current_component_means_no_suggestion():
-    assert "Consider moving" not in _comment("bug-1988762-partial-webrender")
+    assert "Consider moving" not in _diagnosed_comment("bug-1988762-partial-webrender")
 
 
 def test_no_component_means_no_suggestion():
