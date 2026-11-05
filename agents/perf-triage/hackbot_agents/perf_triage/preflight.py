@@ -47,26 +47,47 @@ _PROFILE_ATTACHMENT = re.compile(r"profile.*\.json(\.gz)?$", re.IGNORECASE)
 ATTACHMENT_URL = "https://bugzilla.mozilla.org/attachment.cgi?id={}"
 
 
+Comment = str | dict
+
+
+def comment_text(c: Comment) -> str:
+    return c if isinstance(c, str) else c.get("text") or ""
+
+
 def profile_urls(
-    bug: dict, comments: list[str], attachments: list[dict] = ()
+    bug: dict, comments: list[Comment], attachments: list[dict] = ()
 ) -> list[str]:
-    """Profile links from the URL field, the comments, then attached profiles."""
-    found: list[str] = []
-    for text in [bug.get("url") or "", *comments]:
-        for url in _PROFILE_URL.findall(text):
-            url = url.rstrip(".,;:")
-            if url not in found:
-                found.append(url)
+    """Profile links from the URL field, the comments and attached profiles, NEWEST first.
+
+    The newest profile is usually the most representative of the bug's current
+    state (Patricia, 2026-11-05), so it leads and is the one analysed first.
+    Order is by Bugzilla ``creation_time`` where known; the URL field counts as
+    oldest, and a comment given as bare text keeps its position in the thread.
+    A link repeated later counts at its first appearance.
+    """
+    found: dict[str, tuple[str, int]] = {}
+    seq = 0
+
+    def add(url: str, when: str) -> None:
+        nonlocal seq
+        seq += 1
+        if url not in found:
+            found[url] = (when, seq)
+
+    for url in _PROFILE_URL.findall(bug.get("url") or ""):
+        add(url.rstrip(".,;:"), "")
+    for c in comments:
+        when = "" if isinstance(c, str) else c.get("creation_time") or ""
+        for url in _PROFILE_URL.findall(comment_text(c)):
+            add(url.rstrip(".,;:"), when)
     for att in attachments:
         if (
             not att.get("is_obsolete")
             and not att.get("is_private")
             and _PROFILE_ATTACHMENT.search(att.get("file_name") or "")
         ):
-            url = ATTACHMENT_URL.format(att["id"])
-            if url not in found:
-                found.append(url)
-    return found
+            add(ATTACHMENT_URL.format(att["id"]), att.get("creation_time") or "")
+    return sorted(found, key=lambda u: found[u], reverse=True)
 
 
 async def _call(server: McpServerConfig, tool: str, args: dict) -> dict:
@@ -101,12 +122,17 @@ async def fetch_bug(server: McpServerConfig, bug_id: int) -> dict:
         return {}
 
 
-async def fetch_comments(server: McpServerConfig, bug_id: int) -> list[str]:
-    """Comment texts through the broker; ``[]`` on any failure."""
+async def fetch_comments(server: McpServerConfig, bug_id: int) -> list[dict]:
+    """Comments (text, creation_time) through the broker; ``[]`` on any failure."""
     try:
         data = await _call(server, "get_bug_comments", {"bug_id": bug_id})
         comments = data.get("comments") or []
-        return [c.get("text", "") for c in comments if isinstance(c, dict)]
+        # Text and time: the time orders profile links newest first.
+        return [
+            {"text": c.get("text", ""), "creation_time": c.get("creation_time")}
+            for c in comments
+            if isinstance(c, dict)
+        ]
     except Exception as e:
         print(
             f"[perf_triage] comment lookup failed ({type(e).__name__}: {e})",

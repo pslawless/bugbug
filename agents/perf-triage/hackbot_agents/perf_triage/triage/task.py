@@ -127,7 +127,12 @@ class PerfTriage(Task):
                 "Run it from there; do not search for it.",
             ]
         if self.analyse_profile and self.profile_urls:
-            lines += ["", "Profiles linked from this bug (analyse them in Step 3):"]
+            lines += [
+                "",
+                "Profiles linked from this bug, NEWEST FIRST (analyse them in "
+                "Step 3, starting with the first: the newest profile is usually "
+                "the most representative of the bug's current state):",
+            ]
             lines += [f"- {u}" for u in self.profile_urls]
         lines += ["", "Follow your task procedure."]
         return "\n".join(lines)
