@@ -149,6 +149,7 @@ async def run_perf_triage(
             mode=mode, num_turns=0, skipped_reason="bug lookup failed"
         )
     comments = await fetch_comments(bugzilla_mcp_server, bug_id)
+    comment_texts = [preflight.comment_text(c) for c in comments]
     write_mode = preflight.write_mode(bug)
     existing = bug.get("cf_performance_impact")
     current = f"{bug.get('product', '')} :: {bug.get('component', '')}"
@@ -179,7 +180,9 @@ async def run_perf_triage(
     if mode == "root-cause":
         assert root_cause is not None
         profile_url = _profile_for_root_cause(None, urls)
-        rc, rc_skipped = await _analyse(bug_id, bug, profile_url, root_cause, comments)
+        rc, rc_skipped = await _analyse(
+            bug_id, bug, profile_url, root_cause, comment_texts
+        )
         if rc is not None and profile_url:
             _record_root_cause(recorder, bug_id, rc, profile_url, current)
         # Nothing here was gated by a stable rating, so a person applies it.
@@ -223,7 +226,9 @@ async def run_perf_triage(
     if mode == "triage+root-cause":
         assert root_cause is not None
         rc_profile = _profile_for_root_cause(result, urls)
-        rc, rc_skipped = await _analyse(bug_id, bug, rc_profile, root_cause, comments)
+        rc, rc_skipped = await _analyse(
+            bug_id, bug, rc_profile, root_cause, comment_texts
+        )
 
     skipped_reason = None
     auto_apply = False

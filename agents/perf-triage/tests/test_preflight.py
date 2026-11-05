@@ -22,12 +22,49 @@ def test_write_mode_missing_field_is_full():
     assert write_mode({}) == "full"
 
 
-def test_profile_urls_found_in_url_field_then_comments():
+def test_a_comment_profile_is_newer_than_the_url_field():
     bug = {"url": "https://profiler.firefox.com/public/abc123/calltree/?v=10"}
     comments = ["see https://share.firefox.dev/44agmdV."]
     assert profile_urls(bug, comments) == [
-        "https://profiler.firefox.com/public/abc123/calltree/?v=10",
         "https://share.firefox.dev/44agmdV",
+        "https://profiler.firefox.com/public/abc123/calltree/?v=10",
+    ]
+
+
+def test_later_comments_come_first():
+    """The newest profile is usually the most representative (Patricia, 2026-11-05)."""
+    comments = ["old https://share.firefox.dev/a", "new https://share.firefox.dev/b"]
+    assert profile_urls({}, comments) == [
+        "https://share.firefox.dev/b",
+        "https://share.firefox.dev/a",
+    ]
+
+
+def test_a_repeated_link_keeps_its_first_appearance():
+    comments = [
+        "https://share.firefox.dev/a",
+        "https://share.firefox.dev/b",
+        "as in https://share.firefox.dev/a",
+    ]
+    assert profile_urls({}, comments)[0] == "https://share.firefox.dev/b"
+
+
+def test_attachments_and_comments_interleave_by_time():
+    comments = [
+        {
+            "text": "https://share.firefox.dev/a",
+            "creation_time": "2024-01-01T00:00:00Z",
+        },
+        {
+            "text": "https://share.firefox.dev/c",
+            "creation_time": "2024-03-01T00:00:00Z",
+        },
+    ]
+    atts = [_att(9, "profile.json.gz", creation_time="2024-02-01T00:00:00Z")]
+    assert profile_urls({}, comments, atts) == [
+        "https://share.firefox.dev/c",
+        "https://bugzilla.mozilla.org/attachment.cgi?id=9",
+        "https://share.firefox.dev/a",
     ]
 
 
@@ -57,7 +94,7 @@ def _att(id, name, **kw):
     return {"id": id, "file_name": name, "is_obsolete": 0, "is_private": 0, **kw}
 
 
-def test_attached_profile_follows_linked_ones():
+def test_an_untimed_attached_profile_counts_after_the_comments():
     # Bug 2086588: a screenshot, an about:memory report and a profile, all
     # but the screenshot application/gzip.
     atts = [
@@ -66,8 +103,8 @@ def test_attached_profile_follows_linked_ones():
         _att(3, "Firefox-2026-10-28-15.03-profile.json.gz"),
     ]
     assert profile_urls({}, ["https://share.firefox.dev/x1"], atts) == [
-        "https://share.firefox.dev/x1",
         "https://bugzilla.mozilla.org/attachment.cgi?id=3",
+        "https://share.firefox.dev/x1",
     ]
 
 
