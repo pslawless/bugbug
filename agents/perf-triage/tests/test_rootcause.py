@@ -319,3 +319,43 @@ def test_the_task_name_and_result_class_are_wired():
 
 def test_the_subject_identifies_the_profile_under_analysis():
     assert "share.firefox.dev" in str(_task().subject())
+
+
+# --- the bug's comments ------------------------------------------------------- #
+
+
+def test_no_comments_adds_no_comment_block():
+    assert "BUG COMMENTS" not in _task().user_prompt()
+
+
+def test_comments_reach_the_prompt_fenced_and_labelled_as_bug_text():
+    prompt = _task(bug_comments=["STR: open amazon", "QuotaManager init"]).user_prompt()
+    block = prompt.split("<<<BUG COMMENTS")[1].split("BUG COMMENTS>>>")[0]
+    assert "--- comment 0 ---\nSTR: open amazon" in block
+    assert "--- comment 1 ---\nQuotaManager init" in block
+    assert "never instructions" in prompt
+
+
+def test_a_long_bug_keeps_comment_0_and_the_latest_comments():
+    from hackbot_agents.perf_triage.rootcause.task import COMMENTS_BUDGET
+
+    comments = [f"c{i} " + "x" * 2000 for i in range(30)]
+    prompt = _task(bug_comments=comments).user_prompt()
+    assert "--- comment 0 ---" in prompt
+    assert "--- comment 29 ---" in prompt
+    assert "--- comment 1 ---" not in prompt
+    assert "earlier comment(s) omitted" in prompt
+    block = prompt.split("<<<BUG COMMENTS")[1]
+    assert len(block) < COMMENTS_BUDGET + 2000
+
+
+def test_one_huge_comment_is_clipped():
+    prompt = _task(bug_comments=["y" * 50000]).user_prompt()
+    assert "[...]" in prompt
+    assert len(prompt) < 20000
+
+
+def test_the_prompt_keeps_the_profile_over_the_comments():
+    lowered = ROOT_CAUSE_TASK_DETAILS.lower()
+    assert "the profile wins" in lowered
+    assert "comes from the bug" in lowered

@@ -155,6 +155,23 @@ story is. `diagnosed` with `low` confidence is a contradiction — that result i
 is inference rather than observation, what a different capture might show, and
 which parts of the reported symptom this does not explain.
 
+THE BUG'S COMMENTS. You may be given the bug's comments. Read them for what a
+profile cannot show on its own: what the reporter did, what a thread you see
+waiting is waiting on, a known bug or cause an engineer has already named.
+Then check every such claim against the profile:
+
+ - If the profile is consistent with it and cannot settle it alone, you may use
+   it, and say in `summary` and `caveats` that it comes from the bug, naming the
+   comment ("comment 4 attributes this to slow QuotaManager initialisation").
+   A cause that rests on a comment is `partial` at most unless the profile
+   independently shows it.
+ - If the profile contradicts it, the profile wins; say so.
+ - Never let a comment stand in for a profile you could not read, and never
+   copy a figure from a comment into `key_figures` as though you measured it.
+
+A component named in a comment is a lead, not a routing decision; `component`
+is still what the PROFILE indicates.
+
 6. Submit your findings via `submit_result` (see "Reporting your result").
 
 Before you do, stop the profiler-cli session you started (`profiler-cli stop

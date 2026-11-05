@@ -174,7 +174,9 @@ def render_root_cause_comment(
         return "\n\n".join(parts)
     else:
         label = "Diagnosed" if rc.outcome == "diagnosed" else "Partial diagnosis"
-        where = f" in `{component}`" if component else ""
+        # Named only on `diagnosed`: on a partial it reads as routing, which a
+        # partial cannot support (same rule as the move suggestion below).
+        where = f" in `{component}`" if component and rc.outcome == "diagnosed" else ""
         parts = [f"**{label}**{where} ({rc.confidence} confidence). {headline}"]
 
     if rc.key_figures:
