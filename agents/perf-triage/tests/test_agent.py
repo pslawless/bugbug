@@ -216,9 +216,10 @@ def rc_fixture(name="bug-1933799-partial-component") -> RootCauseResult:
 
 
 def fake_root_cause(result=None, error=None, seen=None):
-    async def fn(profile_url, bug_summary):
+    async def fn(profile_url, bug_summary, comments):
         if seen is not None:
             seen["rc_profile"] = profile_url
+            seen["rc_comments"] = comments
         if error:
             raise error
         return result or rc_fixture()
@@ -440,3 +441,14 @@ async def test_triage_keeps_its_profile_paragraph_when_root_cause_fails():
 async def test_triage_only_mode_keeps_its_profile_paragraph():
     _, r, _ = await run(triage(**PROFILED), comments=[PROFILE])
     assert "MINI-DIAGNOSIS" in r.actions[0]["params"]["text"]
+
+
+async def test_root_cause_gets_the_bugs_comments():
+    seen: dict = {}
+    await run(
+        triage(),
+        comments=["slow on amazon " + PROFILE, "QuotaManager init, see bug 1671932"],
+        mode="triage+root-cause",
+        root_cause=fake_root_cause(seen=seen),
+    )
+    assert seen["rc_comments"][1] == "QuotaManager init, see bug 1671932"

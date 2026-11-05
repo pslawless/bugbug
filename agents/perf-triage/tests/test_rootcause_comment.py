@@ -91,8 +91,13 @@ def test_comment_does_not_carry_the_attachment_only_fields(name):
 
 def test_a_partial_result_is_labelled_partial_with_its_confidence():
     text = _comment("bug-1988762-partial-webrender")
-    assert text.startswith("**Partial diagnosis** in `Core :: Graphics: WebRender`")
-    assert "(medium confidence)" in text.split("\n")[0]
+    assert text.startswith("**Partial diagnosis** (medium confidence).")
+
+
+def test_a_partial_label_names_no_component():
+    """It reads as routing, which a partial cannot support (1933799)."""
+    label = _comment("bug-1933799-partial-component").split("\n")[0]
+    assert "`Core :: Storage" not in label
 
 
 def test_a_low_confidence_result_names_no_cause():
@@ -113,11 +118,11 @@ def test_a_low_confidence_result_names_no_cause():
     assert "attached as root-cause-1931896.md" in text
 
 
-def test_the_component_is_named_in_the_label_when_there_is_one():
-    text = _comment("bug-1933799-partial-component")
+def test_the_component_is_named_in_the_label_when_diagnosed():
+    text = _diagnosed_comment("bug-1933799-partial-component")
     assert text.startswith(
-        "**Partial diagnosis** in `Core :: Storage: localStorage & sessionStorage`"
-        " (medium confidence)."
+        "**Diagnosed** in `Core :: Storage: localStorage & sessionStorage`"
+        " (high confidence)."
     )
 
 
@@ -288,6 +293,7 @@ def test_html_escaped_model_text_is_unescaped():
     rc, _ = _load("bug-1933799-partial-component")
     rc = rc.model_copy(
         update={
+            "outcome": "diagnosed",
             "component": "Core :: DOM: Core &amp; HTML",
             "headline": "Time in nsTArray_Impl&lt;nsCOMPtr&gt; dominates.",
         }

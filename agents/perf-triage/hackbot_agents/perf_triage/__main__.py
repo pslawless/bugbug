@@ -52,9 +52,15 @@ async def main(ctx: HackbotContext) -> PerfTriageFindings:
             analyse_profile=bool(profile_urls),
         ).run()
 
-    async def root_cause(profile_url: str, bug_summary: str | None):
+    async def root_cause(
+        profile_url: str, bug_summary: str | None, comments: list[str]
+    ):
         return await RootCause(
-            config, tracker, profile_url=profile_url, bug_summary=bug_summary
+            config,
+            tracker,
+            profile_url=profile_url,
+            bug_summary=bug_summary,
+            bug_comments=comments,
         ).run()
 
     findings = await run_perf_triage(

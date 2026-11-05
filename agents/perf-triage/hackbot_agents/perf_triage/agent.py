@@ -48,8 +48,8 @@ logger = logging.getLogger("perf-triage")
 
 Mode = Literal["triage", "triage+root-cause", "root-cause"]
 TriageFn = Callable[[list[str]], Awaitable[TriageResult]]
-# (profile_url, bug_summary) -> result
-RootCauseFn = Callable[[str, str | None], Awaitable[RootCauseResult]]
+# (profile_url, bug_summary, bug comments) -> result
+RootCauseFn = Callable[[str, str | None, list[str]], Awaitable[RootCauseResult]]
 
 
 class PerfTriageFindings(HackbotAgentResult):
@@ -77,13 +77,17 @@ def _profile_for_root_cause(result: TriageResult | None, urls: list[str]) -> str
 
 
 async def _analyse(
-    bug_id: int, bug: dict, profile_url: str | None, root_cause: RootCauseFn
+    bug_id: int,
+    bug: dict,
+    profile_url: str | None,
+    root_cause: RootCauseFn,
+    comments: list[str],
 ) -> tuple[RootCauseResult | None, str | None]:
     """Run the analysis; a failure is a skip reason, never a failed run."""
     if not profile_url:
         return None, "no profile linked"
     try:
-        return await root_cause(profile_url, bug.get("summary")), None
+        return await root_cause(profile_url, bug.get("summary"), comments), None
     except Exception as exc:  # a failed analysis must not cost the triage
         logger.exception("root cause failed for bug %s", bug_id)
         return None, f"root cause failed: {exc}"
@@ -175,7 +179,7 @@ async def run_perf_triage(
     if mode == "root-cause":
         assert root_cause is not None
         profile_url = _profile_for_root_cause(None, urls)
-        rc, rc_skipped = await _analyse(bug_id, bug, profile_url, root_cause)
+        rc, rc_skipped = await _analyse(bug_id, bug, profile_url, root_cause, comments)
         if rc is not None and profile_url:
             _record_root_cause(recorder, bug_id, rc, profile_url, current)
         # Nothing here was gated by a stable rating, so a person applies it.
@@ -219,7 +223,7 @@ async def run_perf_triage(
     if mode == "triage+root-cause":
         assert root_cause is not None
         rc_profile = _profile_for_root_cause(result, urls)
-        rc, rc_skipped = await _analyse(bug_id, bug, rc_profile, root_cause)
+        rc, rc_skipped = await _analyse(bug_id, bug, rc_profile, root_cause, comments)
 
     skipped_reason = None
     auto_apply = False
