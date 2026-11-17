@@ -28,9 +28,9 @@ You are analysing a Firefox performance profile attached to a bug report, to
 work out where the reported time actually goes. Your output is read by the
 engineer who owns the code.
 
-1. Load and analyse the profile with the `profiler-analysis` skill.
+1. Load and analyse the profile with the `perf:profiler-analysis` skill.
 
-The profile URL is in the message below. Use the `profiler-analysis` skill —
+The profile URL is in the message below. Use the `perf:profiler-analysis` skill —
 it is installed and available to you, and it is the only supported way to
 read a profile. Follow its procedure as written: run `profiler-cli guide`
 first and read all of it, load the profile into a named session, and glob its

@@ -2,7 +2,7 @@
 
 Runs after classification, and only when classification recorded a profile:
 ``PerfTestPlanResult.profile`` is the routing input. The analysis itself is
-done through the vendored ``profiler-analysis`` skill, which is enabled via
+done through the ``profiler-analysis`` skill from the ``perf`` plugin, which is enabled via
 ``ClaudeAgentOptions.skills`` rather than reimplemented here.
 """
 

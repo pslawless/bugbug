@@ -1,4 +1,4 @@
-"""The triage step's contract with the vendored triage-perf-bug skill.
+"""The triage step's contract with the triage-perf-bug skill.
 
 The prompt must defer to the skill's agent mode, map its JSON envelope, and not
 copy its criteria; the last test reads the live calculator checkout so an

@@ -253,14 +253,15 @@ def _task(**kwargs):
     return RootCause(TaskConfig(), RunTracker(), **defaults)
 
 
-def test_the_task_enables_the_vendored_skill():
+def test_the_task_enables_the_plugin_skill():
     """`skills=` is what loads profiler-analysis.
 
     Without it the run has no profiler-cli procedure at all and quietly
     improvises one.
     """
     options = _task().agent_options()
-    assert options.skills == ["profiler-analysis"]
+    assert options.skills == ["perf:profiler-analysis"]
+    assert options.plugins[0]["path"].endswith("plugins/perf")
 
 
 def test_the_task_does_not_set_setting_sources_by_hand():

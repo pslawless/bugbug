@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import ClaudeAgentOptions
+from hackbot_agents.perf_triage.plugin import PROFILER_ANALYSIS_SKILL, perf_plugin
 from hackbot_agents.perf_triage.rootcause.prompt import ROOT_CAUSE_TASK_DETAILS
 from hackbot_agents.perf_triage.rootcause.result import RootCauseResult
 from hackbot_agents.perf_triage.tasks import RunTracker, Task, TaskConfig
-from hackbot_agents.perf_triage.vendored import PROFILER_ANALYSIS_SKILL
 
 HERE = Path(__file__).resolve().parent
 
@@ -91,13 +91,10 @@ class RootCause(Task):
 
     def agent_options(self) -> ClaudeAgentOptions:
         options = super().agent_options()
-        # Enable the vendored profiler-analysis skill. This is the ONLY task in
-        # the repo that does not pass setting_sources=[]: the SDK sets
+        # Enable profiler-analysis from the `perf` plugin. The SDK sets
         # setting_sources itself and adds the Skill tool when `skills` is
-        # given, and pinning setting_sources=[] here would switch off the very
-        # discovery that loads the skill from /app/.claude/skills/. Hence the
-        # deliberate divergence from every sibling agent -- the base class's
-        # value is cleared, not overridden with another list.
+        # given, so the base class's value is cleared, not overridden.
+        options.plugins = perf_plugin()
         options.skills = [SKILL_NAME]
         options.setting_sources = None
         return options
